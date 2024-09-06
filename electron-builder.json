@@ -8,6 +8,16 @@
   "files": [
     "**/*"
   ],
+  "extraResources": [
+    {
+      "from": "config.json",
+      "to": "../"
+    },
+    {
+      "from": "tk.xlsx",
+      "to": "../"
+    }
+  ],
   "publish": [],
   "mac": {
     "category": "public.app-category.utilities"
