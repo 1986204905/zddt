@@ -1,6 +1,6 @@
 {
-  "appId": "com.ts.zddt",
-  "productName": "zddt",
+  "appId": "com.ts.automaticAnswers",
+  "productName": "Automatic answers",
   "copyright": "Copyright © 2024 ts",
   "directories": {
     "output": "build"
@@ -28,5 +28,9 @@
   },
   "linux": {
     "target": "AppImage"
+  },
+  "nsis": {
+    "oneClick": false, 
+    "allowToChangeInstallationDirectory": true 
   }
 }

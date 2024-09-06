@@ -1,6 +1,6 @@
 {
-  "name": "zddt",
-  "version": "2.0.0",
+  "name": "automatic-answers",
+  "version": "2.1.1",
   "description": "Automatic answers",
   "main": "main.js",
   "scripts": {
