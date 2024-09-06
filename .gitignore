@@ -1,7 +1,5 @@
 node_modules/
-logs.log
-webkit-2035/
-chrome-win/
+application.log
 example-check/
 build/
 config.txt

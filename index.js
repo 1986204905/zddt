@@ -1,27 +1,13 @@
-global.$fs = require('fs');
-global.$path = require('path');
-global.$moment = require('moment');
 
-const { chromium, webkit } = require('playwright');
+const { chromium } = require('playwright');
 const excel = require('./excel.js');
-const winston = require('winston');
 
-const logger = winston.createLogger({
-    transports: [
-        new winston.transports.File({ filename: 'logs.log' })
-    ]
-});
-
-let configFile = "./config.json";
-let config = $fs.readFileSync($path.join(process.cwd(), configFile), 'utf8');
-config = JSON.parse(config);
-
-const browserPath = "./webkit-2035/Playwright.exe";
-const pageGotoPath = config.pageGotoPath;
-const loginRequestURL = config.loginRequestURL;
-const tkPath = config.tkPath;
-const wtFailedCount = config.wtFailedCount;
-const account = config.account;
+const pageGotoPath = global.$config.pageGotoPath;
+const loginRequestURL = global.$config.loginRequestURL;
+const tkPath = global.$config.tkPath;
+const wtFailedCount = global.$config.wtFailedCount;
+const account = global.$config.account;
+const connectOverCDPPort = global.$config.connectOverCDPPort;
 const ctMap = {
     "A": "C",
     "B": "A",
@@ -29,74 +15,75 @@ const ctMap = {
     "D": "B"
 }
 
-// const pageGotoPath = "file:///E:/nodeSpace/%E4%BF%A1%E9%80%9A%E4%BA%91%E5%AD%A6%E5%A0%82/%E4%BF%A1%E9%80%9A%E4%BA%91%E5%AD%A6%E5%A0%82.html";
-// const tkPath = "./tk.xlsx";
-// const wtFailedCount = 0
 
 let danxData = [];
 let duoxData = [];
 let pdData = [];
 let wtCount = 0;
 
-(async () => {
+async function zddtStart() {
     let browser = null;
-    if (process.env.NODE_ENV == "development") {
-        browser = await chromium.launch({ headless: false });
-    } else {
-        browser = await webkit.launch({ executablePath: browserPath, headless: false });
-    }
-
-    // 新建一个浏览器上下文
-    const context = await browser.newContext();
-
-
-    // 设置一个较大的窗口尺寸来模拟全屏
-    // 注意：这里使用了一些常见的高分辨率显示屏尺寸作为示例
-    const page = await context.newPage({ viewport: { width: 1600, height: 900 } });
+    browser = await chromium.connectOverCDP(`http://localhost:${connectOverCDPPort}`);
+    const context = browser.contexts()[0];
+    const page = context.pages()[0];
 
     await page.goto(pageGotoPath);
-    if (process.env.NODE_ENV == "development") {
-        await page.setViewportSize({ width: 1600, height: 900 });
-    }
+
+    // 定位输入框
+    let accountInputValue = "";
+
+
 
     // 监听特定URL的网络请求
-    let accountInputValue = "";
     let accountStatus = 0;
-    page.route(loginRequestURL, async route => {
+    page.route(loginRequestURL, async (route, request) => {
         try {
-            logger.info(`检测到用户已登录`);
+            global.$logger.info(`检测到用户已登录`);
             // 检测是否为指定账户
-            const inputLocator = page.locator('#yxtPhone');
-            accountInputValue = await inputLocator.inputValue();
-            logger.info(`${accountInputValue}`);
+            //     // 获取请求方法
+            const method = request.method();
+            // 获取请求体
+            let postData = null;
+            if (method === 'POST') {
+                try {
+                    postData = await request.postDataJSON();
+                } catch (error) {
+                    // 如果不是 JSON 格式，则获取原始字符串数据
+                    postData = await request.postData();
+                }
+            }
+            accountInputValue = postData.login_input_username;
+
             if (account.length < 1 || account.length > 0 && accountInputValue && account.includes(accountInputValue)) {
                 accountStatus = 1;
-                logger.info(`开启答题流程`);
+                global.$logger.info(`开启答题流程`);
             } else {
                 accountStatus = -1;
-                logger.info(`用户不在指定账户内`);
+                global.$logger.info(`用户不在指定账户内`);
             }
+
         } catch (error) {
-            logger.error(`登录流程异常:${error}`);
+            global.$logger.error(`登录流程异常:${error}`);
         } finally {
-            route.continue();
+            await route.continue();
         }
 
     });
 
+
     let randomNumbers = getRandomNumbers(1, 70, wtFailedCount);
-    logger.info(`预设错题:${randomNumbers.join(",")}`);
+    global.$logger.info(`预设错题:${randomNumbers.join(",")}`);
 
     let rv = await excel.parseExcel({ file: tkPath });
     if (rv.code != 0 || !rv.rows) {
-        logger.info('获取题库异常');
+        global.$logger.info('获取题库异常');
         return;
     }
 
     let tkData = rv.rows;
     rv = await excel.parseExcelTransformKeyValueArray({ data: tkData[0], content_rows_index: 0 });
     if (rv.code != 0 || !rv.rows) {
-        logger.info('格式化单选题题库异常');
+        global.$logger.info('格式化单选题题库异常');
         return;
     }
 
@@ -124,7 +111,7 @@ let wtCount = 0;
     });
     rv = await excel.parseExcelTransformKeyValueArray({ data: tkData[1], content_rows_index: 0 });
     if (rv.code != 0 || !rv.rows) {
-        logger.info('格式化多选题题库异常');
+        global.$logger.info('格式化多选题题库异常');
         return;
     }
     duoxData = rv.rows.map((e) => {
@@ -153,7 +140,7 @@ let wtCount = 0;
     });
     rv = await excel.parseExcelTransformKeyValueArray({ data: tkData[2], content_rows_index: 0 });
     if (rv.code != 0 || !rv.rows) {
-        logger.info('格式化判断题题库异常');
+        global.$logger.info('格式化判断题题库异常');
         return;
     }
     pdData = rv.rows.map((e) => {
@@ -197,9 +184,9 @@ let wtCount = 0;
 
         } catch (error) {
             if (error && error.name && error.name == "TimeoutError") {
-                logger.info(`元素未找到或页面加载超时`);
+                global.$logger.info(`元素未找到或页面加载超时`);
             } else {
-                logger.error(`元素未找到或页面加载超时:${error}`);
+                global.$logger.error(`元素未找到或页面加载超时:${error}`);
             }
             checkTargetStatus = false;
             return;
@@ -209,7 +196,7 @@ let wtCount = 0;
 
         try {
 
-            logger.info(`开始答题:${$moment().format("YYYY-MM-DD HH:mm:ss")}`);
+            global.$logger.info(`开始答题:${$moment().format("YYYY-MM-DD HH:mm:ss")}`);
 
             const allChildElements = await parentElement.$$('*');
             let wtNumber = 0;
@@ -228,7 +215,7 @@ let wtCount = 0;
                     let textContent = await nestedElement.innerText();
                     // textContent = "80. [判断题] 工程验收时，主控项目不允许有不符合要求的检验结果，必须全部合格。(2分)";
 
-                    logger.info(`题目内容: ${textContent}`);
+                    global.$logger.info(`题目内容: ${textContent}`);
                     let type = 0;
                     if (textContent.includes("[单选题]")) {
                         type = 1;
@@ -237,7 +224,7 @@ let wtCount = 0;
                     } else if (textContent.includes("[判断题]")) {
                         type = 3;
                     } else {
-                        logger.info(`未知题：${textContent}`);
+                        global.$logger.info(`未知题：${textContent}`);
                         continue;
                     }
                     textContent = await unifyPunctuation(textContent.toString());
@@ -246,7 +233,7 @@ let wtCount = 0;
                     textContentList = textContentList.join("").replace(/\(\s*\)/g, `()`).split("()");
                     let targetContent = textContentList[0].trim();
                     if (!targetContent) {
-                        logger.info(targetContent)
+                        global.$logger.info(targetContent)
                         targetContent = textContentList[1].substring(0, Math.floor(textContentList[1].length / 2))
                     }
 
@@ -254,7 +241,7 @@ let wtCount = 0;
                         targetContent = targetContent.substring(0, Math.floor(targetContent.length / 2));
                     }
 
-                    logger.info(`匹配内容:${targetContent}`);
+                    global.$logger.info(`匹配内容:${targetContent}`);
 
 
                     let filterData = [];
@@ -267,12 +254,12 @@ let wtCount = 0;
                     }
                     let target = filterData.filter((e) => e["题目"].includes(targetContent));
                     if (target.length < 1) {
-                        logger.warn(`未匹配到相关题目`);
+                        global.$logger.warn(`未匹配到相关题目`);
                     }
                     if (target.length > 0) {
                         // 预设错题，修改答案
                         if (randomNumbers.includes(wtNumber)) {
-                            logger.warn(`预设错题`);
+                            global.$logger.warn(`预设错题`);
                             if (type == 1) {
                                 target[0]["正确答案"] = ctMap[target[0]["正确答案"]] || target[0]["正确答案"];
                             } else if (type == 2) {
@@ -308,29 +295,29 @@ let wtCount = 0;
                             XXTextContent = unifyPunctuation(XXTextContent);
                             const startIndex = XXTextContent.indexOf('.') + 2; // 找到点后的第一个字符的索引
                             let result = XXTextContent.substring(startIndex); // 从该索引开始截取直到字符串结束
-                            logger.info(`匹配的选项内容:${result}`);
+                            global.$logger.info(`匹配的选项内容:${result}`);
 
 
 
                             if (type == 1) {
-                                logger.info(`正常答案:${target[0][target[0]["正确答案"]]}`);
+                                global.$logger.info(`正常答案:${target[0][target[0]["正确答案"]]}`);
                                 if (target[0][target[0]["正确答案"]] != result) continue;
                             } else if (type == 2) {
                                 let DAList = target[0]["正确答案"].split("");
                                 let nextStatus = false;
                                 for (let DAItem of DAList) {
-                                    logger.info(`正常答案:${target[0][DAItem]}`);
+                                    global.$logger.info(`正常答案:${target[0][DAItem]}`);
                                     if (target[0][DAItem] != result) continue;
                                     nextStatus = true;
                                 }
                                 if (!nextStatus) continue;
                             } else if (type == 3) {
-                                logger.info(`正常答案:${target[0]["正确答案"]}`);
+                                global.$logger.info(`正常答案:${target[0]["正确答案"]}`);
 
                                 let resultNumber = result == "正确" ? 1 : 0
                                 if (target[0]["正确答案"] != resultNumber) continue;
                             }
-                            logger.info(`答案匹配成功`);
+                            global.$logger.info(`答案匹配成功`);
                             await liElement.click();
 
 
@@ -343,11 +330,11 @@ let wtCount = 0;
 
 
             }
-            logger.info(`答题结束:${$moment().format("YYYY-MM-DD HH:mm:ss")}，已匹配题目：${wtCount}`);
+            global.$logger.info(`答题结束:${$moment().format("YYYY-MM-DD HH:mm:ss")}，已匹配题目：${wtCount}`);
             clearInterval(checkTarget);
             checkTargetStatus = true;
         } catch (error) {
-            logger.error(`答题异常终止:${error}`);
+            global.$logger.error(`答题异常终止:${error}`);
             checkTargetStatus = true;
         }
     }, 2000)
@@ -357,19 +344,18 @@ let wtCount = 0;
     //     try {
     //         await page.evaluate(() => document.body.innerHTML); // 尝试访问页面元素
     //     } catch (error) {
-    //         logger.error(`访问页面时出错，可能已关闭：${error}`);
+    //         global.$logger.error(`访问页面时出错，可能已关闭：${error}`);
     //         clearInterval(checkPage);
     //         clearInterval(checkTarget)
     //         await browser.close();
     //     }
     // }, 2000); // 每5秒检查一次
-
-})();
+}
 
 
 function getRandomNumbers(rangeStart, rangeEnd, count) {
     if (count > (rangeEnd - rangeStart + 1)) {
-        console.log("错误：要求的随机数数量超过范围内的可能值总数。");
+        global.$logger.info("错误：要求的随机数数量超过范围内的可能值总数。");
         return;
     }
 
@@ -400,4 +386,6 @@ function unifyPunctuation(str) {
 
     return str;
 }
+
+module.exports = zddtStart;
 

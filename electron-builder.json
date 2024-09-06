@@ -1,0 +1,22 @@
+{
+  "appId": "com.ts.zddt",
+  "productName": "zddt",
+  "copyright": "Copyright © 2024 ts",
+  "directories": {
+    "output": "build"
+  },
+  "files": [
+    "**/*"
+  ],
+  "publish": [],
+  "mac": {
+    "category": "public.app-category.utilities"
+  },
+  "win": {
+    "target": "nsis",
+     "icon": "./icon.ico"
+  },
+  "linux": {
+    "target": "AppImage"
+  }
+}

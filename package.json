@@ -1,29 +1,22 @@
 {
-  "name": "playwright",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "zddt",
+  "version": "2.0.0",
+  "description": "Automatic answers",
+  "main": "main.js",
   "scripts": {
-    "start": "node ./index.js",
-    "pkg": "pkg ./index.js -t node16-win-x64 --out-path=./build"
-  },
-  "pkg": {
-    "assets": [
-      "webkit-2035",
-      "tk.xlsx",
-      "config.json",
-      "config.text"
-    ],
-    "scripts": [
-      "./index.js"
-    ]
+    "pkg": "pkg ./index.js -t node16-win-x64 --out-path=./build",
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist-win": "electron-builder --win"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@playwright/test": "^1.45.0",
-    "@types/node": "^20.14.8"
+    "@types/node": "^20.14.8",
+    "electron": "^32.0.1",
+    "electron-builder": "^25.0.5"    
   },
   "dependencies": {
     "axios": "^0.19.2",
@@ -33,6 +26,7 @@
     "lodash.map": "^4.6.0",
     "moment": "^2.30.1",
     "winston": "^3.13.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "playwright": "^1.46.1"
   }
 }

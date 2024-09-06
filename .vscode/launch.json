@@ -9,7 +9,7 @@
       "request": "launch",
       "name": "启动程序",
       "skipFiles": ["<node_internals>/**"],
-      "program": "${workspaceFolder}\\example-check.js",
+      "program": "${workspaceFolder}\\main.js",
       "env": {
         "NODE_ENV": "development1"
       },
