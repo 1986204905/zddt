@@ -5,6 +5,7 @@
   "main": "main.js",
   "scripts": {
     "pkg": "pkg ./index.js -t node16-win-x64 --out-path=./build",
+    "start-dev": "cross-env NODE_ENV=development electron .",
     "start": "electron .",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
@@ -15,8 +16,9 @@
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^20.14.8",
+    "cross-env": "^7.0.3",
     "electron": "^32.0.1",
-    "electron-builder": "^25.0.5"    
+    "electron-builder": "^25.0.5"
   },
   "dependencies": {
     "axios": "^0.19.2",

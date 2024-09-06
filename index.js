@@ -2,7 +2,7 @@
 const { chromium } = require('playwright');
 const excel = require('./excel.js');
 
-const pageGotoPath = global.$config.pageGotoPath;
+let pageGotoPath = global.$config.pageGotoPath;
 const loginRequestURL = global.$config.loginRequestURL;
 const tkPath = global.$config.tkPath;
 const wtFailedCount = global.$config.wtFailedCount;
@@ -14,7 +14,9 @@ const ctMap = {
     "C": "D",
     "D": "B"
 }
-
+if (process.env.NODE_ENV == "development") {
+    pageGotoPath = "file:///E:/nodeSpace/%E4%BF%A1%E9%80%9A%E4%BA%91%E5%AD%A6%E5%A0%82/%E4%BF%A1%E9%80%9A%E4%BA%91%E5%AD%A6%E5%A0%82.html";
+}
 
 let danxData = [];
 let duoxData = [];
@@ -36,6 +38,10 @@ async function zddtStart() {
 
     // 监听特定URL的网络请求
     let accountStatus = 0;
+    if (process.env.NODE_ENV == "development") {
+        accountStatus = 1;
+        global.$logger.info(`开启答题流程development`);
+    }
     page.route(loginRequestURL, async (route, request) => {
         try {
             global.$logger.info(`检测到用户已登录`);
@@ -213,7 +219,9 @@ async function zddtStart() {
 
                     // 示例：打印嵌套元素的innerText 
                     let textContent = await nestedElement.innerText();
-                    // textContent = "80. [判断题] 工程验收时，主控项目不允许有不符合要求的检验结果，必须全部合格。(2分)";
+                    if (process.env.NODE_ENV == "development") {
+                        // textContent = "80. [判断题] 工程验收时，主控项目不允许有不符合要求的检验结果，必须全部合格。(2分)";
+                    }
 
                     global.$logger.info(`题目内容: ${textContent}`);
                     let type = 0;
@@ -280,15 +288,35 @@ async function zddtStart() {
                     for (const element of xxElements) {
                         // 在每个找到的元素下查找所有的li子元素
                         const liElements = await element.$$('li');
+
                         let i = 0;
                         for (const liElement of liElements) {
+
                             if (target.length < 1) {
                                 if (i > 0) continue;
                                 try {
                                     await liElement.click();
                                 } catch (e) {
                                     global.$logger.error(`点击选项异常1:${e}`);
+                                    try {
+                                        await page.$(`.ks_wt`);
+                                        await page.$(`.ks_abcd`);
+                                        const startElement = await page.$(`#submitExam`);
+                                        const startTextContent = await startElement.inputValue();
+                                        if (startTextContent != "提交答卷") {
+                                            global.$logger.error(`startTextContent异常:${startTextContent}`);
+                                        }
+                                        // 检查元素是否可见
+                                        const isVisible = await startElement.isVisible();
+
+                                        if (!isVisible) {
+                                            global.$logger.error(`startTextContent元素不可见:${isVisible}`);
+                                        }
+                                    } catch (e) {
+                                        global.$logger.error(`ks_wt、ks_abcd、submitExam获取异常:${e}`);
+                                    }
                                 }
+
                                 i++;
                                 let randomNum = (Math.floor(Math.random() * (10 - 3 + 1)) + 3) * 1000;
                                 await page.waitForTimeout(randomNum);
@@ -326,6 +354,23 @@ async function zddtStart() {
                                 await liElement.click();
                             } catch (e) {
                                 global.$logger.error(`点击选项异常2:${e}`);
+                                try {
+                                    await page.$(`.ks_wt`);
+                                    await page.$(`.ks_abcd`);
+                                    const startElement = await page.$(`#submitExam`);
+                                    const startTextContent = await startElement.inputValue();
+                                    if (startTextContent != "提交答卷") {
+                                        global.$logger.error(`startTextContent异常:${startTextContent}`);
+                                    }
+                                    // 检查元素是否可见
+                                    const isVisible = await startElement.isVisible();
+
+                                    if (!isVisible) {
+                                        global.$logger.error(`startTextContent元素不可见:${isVisible}`);
+                                    }
+                                } catch (e) {
+                                    global.$logger.error(`ks_wt、ks_abcd、submitExam获取异常:${e}`);
+                                }
                             }
 
 

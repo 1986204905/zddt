@@ -7,7 +7,7 @@ const logger = winston.createLogger({
     level: 'info',
     format: winston.format.combine(
         winston.format.timestamp(),
-        winston.format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`)
+        winston.format.printf(info => `${global.$moment(info.timestamp).format('YYYY-MM-DD HH:mm:ss SSS')} ${info.level}: ${info.message}`)
     ),
     transports: [
         new winston.transports.File({ filename: 'application.log' })
@@ -34,7 +34,7 @@ function createWindow() {
             nodeIntegration: true,
             enableRemoteModule: true,
             webSecurity: false, // 只在测试环境中使用
-            devTools: false,
+            devTools: process.env.NODE_ENV == "development" ? true : false,
         }
     });
 
