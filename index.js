@@ -284,7 +284,11 @@ async function zddtStart() {
                         for (const liElement of liElements) {
                             if (target.length < 1) {
                                 if (i > 0) continue;
-                                await liElement.click();
+                                try {
+                                    await liElement.click();
+                                } catch (e) {
+                                    global.$logger.error(`点击选项异常1:${e}`);
+                                }
                                 i++;
                                 let randomNum = (Math.floor(Math.random() * (10 - 3 + 1)) + 3) * 1000;
                                 await page.waitForTimeout(randomNum);
@@ -318,7 +322,11 @@ async function zddtStart() {
                                 if (target[0]["正确答案"] != resultNumber) continue;
                             }
                             global.$logger.info(`答案匹配成功`);
-                            await liElement.click();
+                            try {
+                                await liElement.click();
+                            } catch (e) {
+                                global.$logger.error(`点击选项异常2:${e}`);
+                            }
 
 
                             let randomNum = (Math.floor(Math.random() * (10 - 3 + 1)) + 3) * 1000;
