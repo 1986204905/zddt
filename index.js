@@ -5,7 +5,8 @@ const excel = require('./excel.js');
 let pageGotoPath = global.$config.pageGotoPath;
 const loginRequestURL = global.$config.loginRequestURL;
 const tkPath = global.$config.tkPath;
-const wtFailedCount = global.$config.wtFailedCount;
+const wtMinFailedCount = global.$config.wtMinFailedCount;
+const wtMaxFailedCount = global.$config.wtMaxFailedCount;
 const account = global.$config.account;
 const connectOverCDPPort = global.$config.connectOverCDPPort;
 const ctMap = {
@@ -75,9 +76,10 @@ async function zddtStart() {
         }
 
     });
+    const wtRandomInt = getRandomInt(wtMinFailedCount, wtMaxFailedCount);
+    global.$logger.info(`预设错题数量:${wtRandomInt}`);
 
-
-    let randomNumbers = getRandomNumbers(1, 70, wtFailedCount);
+    let randomNumbers = getRandomNumbers(1, 70, wtRandomInt);
     global.$logger.info(`预设错题:${randomNumbers.join(",")}`);
 
     let rv = await excel.parseExcel({ file: tkPath });
@@ -439,6 +441,15 @@ function unifyPunctuation(str) {
 
     return str;
 }
+
+function getRandomInt(min, max) {
+    // 确保 min 和 max 是整数，并且 min 小于等于 max
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    // 生成随机整数，包括 min 和 max
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 
 module.exports = zddtStart;
 
