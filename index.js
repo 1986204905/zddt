@@ -9,6 +9,7 @@ const wtMinFailedCount = global.$config.wtMinFailedCount;
 const wtMaxFailedCount = global.$config.wtMaxFailedCount;
 const account = global.$config.account;
 const connectOverCDPPort = global.$config.connectOverCDPPort;
+const totalTime = global.$config.totalTime;
 const ctMap = {
     "A": "C",
     "B": "A",
@@ -207,13 +208,26 @@ async function zddtStart() {
             global.$logger.info(`开始答题:${$moment().format("YYYY-MM-DD HH:mm:ss")}`);
 
             const allChildElements = await parentElement.$$('*');
+            // 获取问题数量
+            let totalQuestions = 0;
+            if (allChildElements && allChildElements.length > 0) {
+                const classes = await allChildElements[0].getAttribute('class');
+            }
+            allChildElements.forEach((e) => {
+                if (!e._preview || !e._preview.includes("ks_wt_div exam-header")) return;
+                totalQuestions++;
+            })
+
+            totalQuestions = totalQuestions ? totalQuestions : 200;
+
+            let wtTimes = await getRandomTimes(totalTime, totalQuestions);
+
             let wtNumber = 0;
             for (let child of allChildElements) {
-                const classes = await child.getAttribute('class');
-                if (!classes || !classes.includes("ks_wt_div exam-header")) continue;
+                // const classes = await child.getAttribute('class');
+                if (!child._preview || !child._preview.includes("ks_wt_div exam-header")) continue;
                 // 对于每个找到的元素，查找其内部具有nestedTargetClass的子元素
                 const nestedElements = await child.$$(`.${"ks_wt"}`);
-
 
                 // 根据需要处理每一个找到的嵌套元素
                 for (const nestedElement of nestedElements) {
@@ -320,7 +334,8 @@ async function zddtStart() {
                                 }
 
                                 i++;
-                                let randomNum = (Math.floor(Math.random() * (10 - 3 + 1)) + 3) * 1000;
+                                // let randomNum = (Math.floor(Math.random() * (10 - 3 + 1)) + 3) * 1000;
+                                let randomNum = wtTimes[wtNumber - 1] ? wtTimes[wtNumber - 1] * 1000 : 3000;
                                 await page.waitForTimeout(randomNum);
                                 continue;
                             }
@@ -376,7 +391,8 @@ async function zddtStart() {
                             }
 
 
-                            let randomNum = (Math.floor(Math.random() * (10 - 3 + 1)) + 3) * 1000;
+                            // let randomNum = (Math.floor(Math.random() * (10 - 3 + 1)) + 3) * 1000;
+                            let randomNum = wtTimes[wtNumber - 1] ? wtTimes[wtNumber - 1] * 1000 : 3000;
                             await page.waitForTimeout(randomNum);
 
                         }
@@ -449,7 +465,57 @@ function getRandomInt(min, max) {
     // 生成随机整数，包括 min 和 max
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
+function getRandomTimes(totalTime, totalQuestions) {
+    let times = [];
 
+    totalTime = totalTime ? totalTime : 2400;
+    totalQuestions = totalQuestions ? totalQuestions : 200;
+
+    const averageTimePerQuestion = Math.floor(totalTime / totalQuestions);
+
+    let minTimePerQuestion = 1;
+    let maxTimePerQuestion = averageTimePerQuestion + 3;
+
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    let currentTime = 0;
+
+    for (let i = 0; i < totalQuestions; i++) {
+        const timeForThisQuestion = getRandomInt(minTimePerQuestion, maxTimePerQuestion);
+        currentTime += timeForThisQuestion;
+        times.push(timeForThisQuestion);
+    }
+
+    const timeDifference = totalTime - currentTime;
+
+    if (timeDifference !== 0) {
+        if (timeDifference > 0) {
+            // 需要增加时间
+            for (let i = 0; i < timeDifference; i++) {
+                const index = Math.floor(Math.random() * totalQuestions);
+                times[index]++;
+            }
+        } else {
+            // 需要减少时间
+            for (let i = 0; i < Math.abs(timeDifference); i++) {
+                let index;
+                do {
+                    index = Math.floor(Math.random() * totalQuestions);
+                } while (times[index] < 1); // 确保时间不会减少到0或负数
+                times[index]--;
+            }
+        }
+
+        // 重新计算总时间
+        currentTime = times.reduce((acc, val) => acc + val, 0);
+    }
+    global.$logger.info(`总时间:${currentTime}秒`);
+    global.$logger.info(`每题时间:${times}`);
+
+    return times;
+}
 
 module.exports = zddtStart;
 
