@@ -1,6 +1,6 @@
 {
   "name": "automatic-answers",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "description": "Automatic answers",
   "main": "main.js",
   "scripts": {

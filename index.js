@@ -9,7 +9,11 @@ const wtMinFailedCount = global.$config.wtMinFailedCount;
 const wtMaxFailedCount = global.$config.wtMaxFailedCount;
 const account = global.$config.account;
 const connectOverCDPPort = global.$config.connectOverCDPPort;
-const totalTime = global.$config.totalTime;
+let totalTime = 0;
+const minTotalTime = global.$config.minTotalTime || 2000;
+const maxTotalTime = global.$config.maxTotalTime || 2400;
+const accountPath = global.$config.accountPath;
+
 const ctMap = {
     "A": "C",
     "B": "A",
@@ -36,7 +40,19 @@ async function zddtStart() {
     // 定位输入框
     let accountInputValue = "";
 
+    let rv = await excel.parseExcel({ file: accountPath });
+    if (rv.code != 0 || !rv.rows) {
+        global.$logger.info('获取账户异常');
+        return;
+    }
 
+    let accountData = rv.rows;
+    rv = await excel.parseExcelTransformKeyValueArray({ data: accountData[0], content_rows_index: 0 });
+    if (rv.code != 0 || !rv.rows) {
+        global.$logger.info('格式化账户异常');
+        return;
+    }
+    accountData = rv.rows.map((e) => String(e["账户"]));
 
     // 监听特定URL的网络请求
     let accountStatus = 0;
@@ -62,7 +78,7 @@ async function zddtStart() {
             }
             accountInputValue = postData.login_input_username;
 
-            if (account.length < 1 || account.length > 0 && accountInputValue && account.includes(accountInputValue)) {
+            if (accountData.length < 1 || accountData.length > 0 && accountInputValue && accountData.includes(String(accountInputValue))) {
                 accountStatus = 1;
                 global.$logger.info(`开启答题流程`);
             } else {
@@ -83,7 +99,7 @@ async function zddtStart() {
     let randomNumbers = getRandomNumbers(1, 70, wtRandomInt);
     global.$logger.info(`预设错题:${randomNumbers.join(",")}`);
 
-    let rv = await excel.parseExcel({ file: tkPath });
+    rv = await excel.parseExcel({ file: tkPath });
     if (rv.code != 0 || !rv.rows) {
         global.$logger.info('获取题库异常');
         return;
@@ -158,6 +174,9 @@ async function zddtStart() {
         }
         return e;
     });
+
+    // 获取所有题目所需总时间
+    totalTime = getRandomInt(minTotalTime, maxTotalTime);
 
     let parentElement = null;
     let checkTargetStatus = false;
