@@ -3,7 +3,7 @@
   "productName": "Automatic answers",
   "copyright": "Copyright © 2024 ts",
   "directories": {
-    "output": "build"
+    "output": "../zddt_build"
   },
   "files": [
     "**/*"
@@ -20,7 +20,7 @@
     {
       "from": "account.xlsx",
       "to": "../"
-    }    
+    }  
   ],
   "publish": [],
   "mac": {
@@ -28,13 +28,14 @@
   },
   "win": {
     "target": "nsis",
-     "icon": "./icon.ico"
+    "icon": "./icon.ico"
   },
   "linux": {
     "target": "AppImage"
   },
   "nsis": {
     "oneClick": false, 
-    "allowToChangeInstallationDirectory": true 
+    "allowToChangeInstallationDirectory": true,
+    "include": "./installer.nsh"
   }
 }
