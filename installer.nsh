@@ -302,6 +302,14 @@ Pop $3
 Pop $4
 FunctionEnd
 
-Section
+Section "Install"
+   ; 检查 account.xlsx 文件是否存在
+    IfFileExists "$EXEDIR\account.xlsx" +2 0
+        MessageBox MB_OK "未检测到 account.xlsx 文件，请安装点击完成后手动将 account.xlsx 文件 添加至 $INSTDIR 目录下。"
+        ; Abort
+
+   ; 复制外部文件到安装目录
+    CopyFiles /SILENT /FILESONLY "$EXEDIR\account.xlsx" "$INSTDIR\account.xlsx"
+    DetailPrint "account.xlsx has been copied from $EXEDIR to $INSTDIR"
 SectionEnd
 
