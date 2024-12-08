@@ -62,6 +62,8 @@ async function zddtStart() {
     }
     page.route(loginRequestURL, async (route, request) => {
         try {
+            accountStatus = 0;
+
             global.$logger.info(`检测到用户已登录`);
             // 检测是否为指定账户
             //     // 获取请求方法
@@ -86,6 +88,22 @@ async function zddtStart() {
                 global.$logger.info(`用户不在指定账户内`);
             }
 
+            if(accountStatus == 1){
+                let wtRandomInt = getRandomInt(wtMinFailedCount, wtMaxFailedCount);
+                global.$logger.info(`预设错题数量:${wtRandomInt}`);
+            
+                let randomNumbers = getRandomNumbers(1, 70, wtRandomInt);
+                global.$logger.info(`预设错题:${randomNumbers.join(",")}`);
+            
+            
+                // 获取所有题目所需总时间
+                totalTime = getRandomInt(minTotalTime, maxTotalTime);
+            
+                let parentElement = null;
+                let checkTargetStatus = false;
+
+                myInterval.set();
+            }
         } catch (error) {
             global.$logger.error(`登录流程异常:${error}`);
         } finally {
@@ -93,11 +111,7 @@ async function zddtStart() {
         }
 
     });
-    const wtRandomInt = getRandomInt(wtMinFailedCount, wtMaxFailedCount);
-    global.$logger.info(`预设错题数量:${wtRandomInt}`);
 
-    let randomNumbers = getRandomNumbers(1, 70, wtRandomInt);
-    global.$logger.info(`预设错题:${randomNumbers.join(",")}`);
 
     rv = await excel.parseExcel({ file: tkPath });
     if (rv.code != 0 || !rv.rows) {
@@ -174,6 +188,264 @@ async function zddtStart() {
         }
         return e;
     });
+
+    const myInterval = createRepeatableInterval(async () => {
+
+        try {
+            if (checkTargetStatus || accountStatus !== 1) return;
+    
+            checkTargetStatus = true;
+    
+            const startSelector = '#submitExam';
+    
+            await page.waitForSelector(startSelector, { timeout: 5000 });
+    
+            const startElement = await page.$(startSelector);
+            const startTextContent = await startElement.inputValue();
+    
+            if (startTextContent != "提交答卷") {
+                checkTargetStatus = false;
+                return;
+            }
+    
+    
+            const selector = '#set_div_wyks_detail';
+            await page.waitForSelector(selector, { timeout: 5000 });
+    
+            parentElement = await page.$(selector);
+    
+    
+            if (!parentElement) {
+                checkTargetStatus = false;
+                return;
+            }
+    
+        } catch (error) {
+            if (error && error.name && error.name == "TimeoutError") {
+                global.$logger.info(`元素未找到或页面加载超时`);
+            } else {
+                global.$logger.error(`元素未找到或页面加载超时:${error}`);
+            }
+            checkTargetStatus = false;
+            return;
+        }
+    
+    
+    
+        try {
+    
+            global.$logger.info(`开始答题:${$moment().format("YYYY-MM-DD HH:mm:ss")}`);
+    
+            const allChildElements = await parentElement.$$('*');
+            // 获取问题数量
+            let totalQuestions = 0;
+            if (allChildElements && allChildElements.length > 0) {
+                const classes = await allChildElements[0].getAttribute('class');
+            }
+            allChildElements.forEach((e) => {
+                if (!e._preview || !e._preview.includes("ks_wt_div exam-header")) return;
+                totalQuestions++;
+            })
+    
+            totalQuestions = totalQuestions ? totalQuestions : 200;
+    
+            let wtTimes = await getRandomTimes(totalTime, totalQuestions);
+    
+            let wtNumber = 0;
+            for (let child of allChildElements) {
+                // const classes = await child.getAttribute('class');
+                if (!child._preview || !child._preview.includes("ks_wt_div exam-header")) continue;
+                // 对于每个找到的元素，查找其内部具有nestedTargetClass的子元素
+                const nestedElements = await child.$$(`.${"ks_wt"}`);
+    
+                // 根据需要处理每一个找到的嵌套元素
+                for (const nestedElement of nestedElements) {
+                    wtNumber++;
+    
+                    // 示例：打印嵌套元素的innerText 
+                    let textContent = await nestedElement.innerText();
+                    if (process.env.NODE_ENV == "development") {
+                        // textContent = "80. [判断题] 工程验收时，主控项目不允许有不符合要求的检验结果，必须全部合格。(2分)";
+                    }
+    
+                    global.$logger.info(`题目内容: ${textContent}`);
+                    let type = 0;
+                    if (textContent.includes("[单选题]")) {
+                        type = 1;
+                    } else if (textContent.includes("[多选题]")) {
+                        type = 2;
+                    } else if (textContent.includes("[判断题]")) {
+                        type = 3;
+                    } else {
+                        global.$logger.info(`未知题：${textContent}`);
+                        continue;
+                    }
+                    textContent = await unifyPunctuation(textContent.toString());
+                    let textContentList = textContent.split("]");
+                    textContentList.shift();
+                    textContentList = textContentList.join("").replace(/\(\s*\)/g, `()`).split("()");
+                    let targetContent = textContentList[0].trim();
+                    if (!targetContent) {
+                        global.$logger.info(targetContent)
+                        targetContent = textContentList[1].substring(0, Math.floor(textContentList[1].length / 2))
+                    }
+    
+                    if (type == 3) {
+                        targetContent = targetContent.substring(0, Math.floor(targetContent.length / 2));
+                    }
+    
+                    global.$logger.info(`匹配内容:${targetContent}`);
+    
+    
+                    let filterData = [];
+                    if (type == 1) {
+                        filterData = danxData;
+                    } else if (type == 2) {
+                        filterData = duoxData;
+                    } else if (type == 3) {
+                        filterData = pdData;
+                    }
+                    let target = filterData.filter((e) => e["题目"].includes(targetContent));
+                    if (target.length < 1) {
+                        global.$logger.warn(`未匹配到相关题目`);
+                    }
+                    if (target.length > 0) {
+                        // 预设错题，修改答案
+                        if (randomNumbers.includes(wtNumber)) {
+                            global.$logger.warn(`预设错题`);
+                            if (type == 1) {
+                                target[0]["正确答案"] = ctMap[target[0]["正确答案"]] || target[0]["正确答案"];
+                            } else if (type == 2) {
+                                target[0]["正确答案"] = "A";
+                            } else if (type == 3) {
+                                target[0]["正确答案"] = target[0]["正确答案"] == "1" ? "0" : "1"
+                            }
+                        }
+                        wtCount++;
+                    }
+    
+    
+    
+    
+    
+                    const xxElements = await child.$$(`.${"ks_abcd"}`);
+    
+                    for (const element of xxElements) {
+                        // 在每个找到的元素下查找所有的li子元素
+                        const liElements = await element.$$('li');
+    
+                        let i = 0;
+                        for (const liElement of liElements) {
+    
+                            if (target.length < 1) {
+                                if (i > 0) continue;
+                                try {
+                                    await liElement.click();
+                                } catch (e) {
+                                    global.$logger.error(`点击选项异常1:${e}`);
+                                    try {
+                                        await page.$(`.ks_wt`);
+                                        await page.$(`.ks_abcd`);
+                                        const startElement = await page.$(`#submitExam`);
+                                        const startTextContent = await startElement.inputValue();
+                                        if (startTextContent != "提交答卷") {
+                                            global.$logger.error(`startTextContent异常:${startTextContent}`);
+                                        }
+                                        // 检查元素是否可见
+                                        const isVisible = await startElement.isVisible();
+    
+                                        if (!isVisible) {
+                                            global.$logger.error(`startTextContent元素不可见:${isVisible}`);
+                                        }
+                                    } catch (e) {
+                                        global.$logger.error(`ks_wt、ks_abcd、submitExam获取异常:${e}`);
+                                    }
+                                }
+    
+                                i++;
+                                // let randomNum = (Math.floor(Math.random() * (10 - 3 + 1)) + 3) * 1000;
+                                let randomNum = wtTimes[wtNumber - 1] ? wtTimes[wtNumber - 1] * 1000 : 3000;
+                                await page.waitForTimeout(randomNum);
+                                continue;
+                            }
+                            // 处理每个li元素，例如获取文本内容
+                            let XXTextContent = await liElement.innerText();
+                            XXTextContent = unifyPunctuation(XXTextContent);
+                            const startIndex = XXTextContent.indexOf('.') + 2; // 找到点后的第一个字符的索引
+                            let result = XXTextContent.substring(startIndex); // 从该索引开始截取直到字符串结束
+                            global.$logger.info(`匹配的选项内容:${result}`);
+    
+    
+    
+                            if (type == 1) {
+                                global.$logger.info(`正常答案:${target[0][target[0]["正确答案"]]}`);
+                                if (target[0][target[0]["正确答案"]] != result) continue;
+                            } else if (type == 2) {
+                                let DAList = target[0]["正确答案"].split("");
+                                let nextStatus = false;
+                                for (let DAItem of DAList) {
+                                    global.$logger.info(`正常答案:${target[0][DAItem]}`);
+                                    if (target[0][DAItem] != result) continue;
+                                    nextStatus = true;
+                                }
+                                if (!nextStatus) continue;
+                            } else if (type == 3) {
+                                global.$logger.info(`正常答案:${target[0]["正确答案"]}`);
+    
+                                let resultNumber = result == "正确" ? 1 : 0
+                                if (target[0]["正确答案"] != resultNumber) continue;
+                            }
+                            global.$logger.info(`答案匹配成功`);
+                            try {
+                                await liElement.click();
+                            } catch (e) {
+                                global.$logger.error(`点击选项异常2:${e}`);
+                                try {
+                                    await page.$(`.ks_wt`);
+                                    await page.$(`.ks_abcd`);
+                                    const startElement = await page.$(`#submitExam`);
+                                    const startTextContent = await startElement.inputValue();
+                                    if (startTextContent != "提交答卷") {
+                                        global.$logger.error(`startTextContent异常:${startTextContent}`);
+                                    }
+                                    // 检查元素是否可见
+                                    const isVisible = await startElement.isVisible();
+    
+                                    if (!isVisible) {
+                                        global.$logger.error(`startTextContent元素不可见:${isVisible}`);
+                                    }
+                                } catch (e) {
+                                    global.$logger.error(`ks_wt、ks_abcd、submitExam获取异常:${e}`);
+                                }
+                            }
+    
+    
+                            // let randomNum = (Math.floor(Math.random() * (10 - 3 + 1)) + 3) * 1000;
+                            let randomNum = wtTimes[wtNumber - 1] ? wtTimes[wtNumber - 1] * 1000 : 3000;
+                            await page.waitForTimeout(randomNum);
+    
+                        }
+                    }
+                }
+    
+    
+            }
+            global.$logger.info(`答题结束:${$moment().format("YYYY-MM-DD HH:mm:ss")}，已匹配题目：${wtCount}`);
+            // clearInterval(checkTarget);
+            myInterval.clear();
+            checkTargetStatus = true;
+        } catch (error) {
+            global.$logger.error(`答题异常终止:${error}`);
+            checkTargetStatus = true;
+        }
+      }, 1000);
+    //////////////////
+    const wtRandomInt = getRandomInt(wtMinFailedCount, wtMaxFailedCount);
+    global.$logger.info(`预设错题数量:${wtRandomInt}`);
+
+    let randomNumbers = getRandomNumbers(1, 70, wtRandomInt);
+    global.$logger.info(`预设错题:${randomNumbers.join(",")}`);
+
 
     // 获取所有题目所需总时间
     totalTime = getRandomInt(minTotalTime, maxTotalTime);
