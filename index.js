@@ -22,6 +22,7 @@ const ctMap = {
 }
 if (process.env.NODE_ENV == "development") {
     pageGotoPath = "file:///E:/nodeSpace/%E4%BF%A1%E9%80%9A%E4%BA%91%E5%AD%A6%E5%A0%82/%E4%BF%A1%E9%80%9A%E4%BA%91%E5%AD%A6%E5%A0%82.html";
+    // pageGotoPath = "file:///E:/space/%E4%BF%A1%E9%80%9A%E4%BA%91%E5%AD%A6%E5%A0%82/%E4%BF%A1%E9%80%9A%E4%BA%91%E5%AD%A6%E5%A0%82.html";
 }
 
 let danxData = [];
@@ -35,7 +36,7 @@ async function zddtStart() {
     const context = browser.contexts()[0];
     const page = context.pages()[0];
 
-    await page.goto(pageGotoPath);
+    // await page.goto(pageGotoPath);
 
     // 定位输入框
     let accountInputValue = "";
@@ -56,10 +57,7 @@ async function zddtStart() {
 
     // 监听特定URL的网络请求
     let accountStatus = 0;
-    if (process.env.NODE_ENV == "development") {
-        accountStatus = 1;
-        global.$logger.info(`开启答题流程development`);
-    }
+
 
 
 
@@ -149,10 +147,8 @@ async function zddtStart() {
     const myInterval = createRepeatableInterval(async () => {
 
         try {
-            global.$logger.info(`预设错题数量debug1:${wtRandomInt}`);
 
             if (checkTargetStatus || accountStatus !== 1) return;
-            global.$logger.info(`预设错题数量debug2:${wtRandomInt}`);
     
             checkTargetStatus = true;
     
@@ -399,7 +395,29 @@ async function zddtStart() {
             checkTargetStatus = true;
         }
       }, 2000);
+      global.$logger.info(`准备工作已完成`);
 
+
+    await page.goto(pageGotoPath);
+
+      if (process.env.NODE_ENV == "development") {
+        accountStatus = 1;
+        global.$logger.info(`开启答题流程development`);
+        wtRandomInt = getRandomInt(wtMinFailedCount, wtMaxFailedCount);
+        global.$logger.info(`预设错题数量:${wtRandomInt}`);
+    
+        randomNumbers = getRandomNumbers(1, 70, wtRandomInt);
+        global.$logger.info(`预设错题:${randomNumbers.join(",")}`);
+    
+    
+        // 获取所有题目所需总时间
+        totalTime = getRandomInt(minTotalTime, maxTotalTime);
+    
+        parentElement = null;
+        checkTargetStatus = false;
+
+        myInterval.set();
+    }
 
       page.route(loginRequestURL, async (route, request) => {
         try {
@@ -420,6 +438,7 @@ async function zddtStart() {
                 }
             }
             accountInputValue = postData.login_input_username;
+            global.$logger.info(`用户:${accountInputValue}`);
 
             if (accountData.length < 1 || accountData.length > 0 && accountInputValue && accountData.includes(String(accountInputValue))) {
                 accountStatus = 1;
