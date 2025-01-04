@@ -6,7 +6,9 @@
     "output": "../zddt_build"
   },
   "files": [
-    "**/*"
+    "**/*",
+    "!logs/**/*",
+    "account.xlsx"
   ],
   "extraResources": [
     {
@@ -15,10 +17,6 @@
     },
     {
       "from": "tk.xlsx",
-      "to": "../"
-    },
-    {
-      "from": "account.xlsx",
       "to": "../"
     }  
   ],
@@ -33,6 +31,7 @@
   "linux": {
     "target": "AppImage"
   },
+  "asar": true,
   "nsis": {
     "oneClick": false, 
     "allowToChangeInstallationDirectory": true,

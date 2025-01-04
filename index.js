@@ -40,7 +40,9 @@ async function zddtStart() {
 
     // 定位输入框
     let accountInputValue = "";
-
+    if (process.env.NODE_ENV == "development") {
+        accountInputValue = "12345678";
+    }
     let rv = await excel.parseExcel({ file: accountPath });
     if (rv.code != 0 || !rv.rows) {
         global.$logger.info('获取账户异常');
@@ -143,39 +145,39 @@ async function zddtStart() {
 
 
     let parentElement = null;
-    let checkTargetStatus = false;    
+    let checkTargetStatus = false;
     const myInterval = createRepeatableInterval(async () => {
 
         try {
 
             if (checkTargetStatus || accountStatus !== 1) return;
-    
+
             checkTargetStatus = true;
-    
+
             const startSelector = '#submitExam';
-    
+
             await page.waitForSelector(startSelector, { timeout: 5000 });
-    
+
             const startElement = await page.$(startSelector);
             const startTextContent = await startElement.inputValue();
-    
+
             if (startTextContent != "提交答卷") {
                 checkTargetStatus = false;
                 return;
             }
-    
-    
+
+
             const selector = '#set_div_wyks_detail';
             await page.waitForSelector(selector, { timeout: 5000 });
-    
+
             parentElement = await page.$(selector);
-    
-    
+
+
             if (!parentElement) {
                 checkTargetStatus = false;
                 return;
             }
-    
+
         } catch (error) {
             if (error && error.name && error.name == "TimeoutError") {
                 global.$logger.info(`元素未找到或页面加载超时`);
@@ -185,13 +187,13 @@ async function zddtStart() {
             checkTargetStatus = false;
             return;
         }
-    
-    
-    
+
+
+
         try {
-    
+
             global.$logger.info(`开始答题:${$moment().format("YYYY-MM-DD HH:mm:ss")}`);
-    
+
             const allChildElements = await parentElement.$$('*');
             // 获取问题数量
             let totalQuestions = 0;
@@ -202,28 +204,28 @@ async function zddtStart() {
                 if (!e._preview || !e._preview.includes("ks_wt_div exam-header")) return;
                 totalQuestions++;
             })
-    
+
             totalQuestions = totalQuestions ? totalQuestions : 200;
-    
+
             let wtTimes = await getRandomTimes(totalTime, totalQuestions);
-    
+
             let wtNumber = 0;
             for (let child of allChildElements) {
                 // const classes = await child.getAttribute('class');
                 if (!child._preview || !child._preview.includes("ks_wt_div exam-header")) continue;
                 // 对于每个找到的元素，查找其内部具有nestedTargetClass的子元素
                 const nestedElements = await child.$$(`.${"ks_wt"}`);
-    
+
                 // 根据需要处理每一个找到的嵌套元素
                 for (const nestedElement of nestedElements) {
                     wtNumber++;
-    
+
                     // 示例：打印嵌套元素的innerText 
                     let textContent = await nestedElement.innerText();
                     if (process.env.NODE_ENV == "development") {
                         // textContent = "80. [判断题] 工程验收时，主控项目不允许有不符合要求的检验结果，必须全部合格。(2分)";
                     }
-    
+
                     global.$logger.info(`题目内容: ${textContent}`);
                     let type = 0;
                     if (textContent.includes("[单选题]")) {
@@ -245,14 +247,14 @@ async function zddtStart() {
                         global.$logger.info(targetContent)
                         targetContent = textContentList[1].substring(0, Math.floor(textContentList[1].length / 2))
                     }
-    
+
                     if (type == 3) {
                         targetContent = targetContent.substring(0, Math.floor(targetContent.length / 2));
                     }
-    
+
                     global.$logger.info(`匹配内容:${targetContent}`);
-    
-    
+
+
                     let filterData = [];
                     if (type == 1) {
                         filterData = danxData;
@@ -279,26 +281,41 @@ async function zddtStart() {
                         }
                         wtCount++;
                     }
-    
-    
-    
-    
-    
+
+
+
+
+
                     const xxElements = await child.$$(`.${"ks_abcd"}`);
-    
+
                     for (const element of xxElements) {
                         // 在每个找到的元素下查找所有的li子元素
                         const liElements = await element.$$('li');
-    
+
                         let i = 0;
                         for (const liElement of liElements) {
-    
+
                             if (target.length < 1) {
                                 if (i > 0) continue;
                                 try {
                                     await liElement.click();
                                 } catch (e) {
                                     global.$logger.error(`点击选项异常1:${e}`);
+                                    try{
+                                        // 截取整个页面的屏幕截图并保存为 'example.png'
+                                        let screenshotsFileDir = `./logs/${accountInputValue}.png`;
+                                        if (!$fs.existsSync(screenshotsFileDir)) {
+                                            await page.screenshot({ path: screenshotsFileDir, fullPage: true });
+                                        }
+                                        // 获取页面的HTML内容
+                                        let htmlFileDir = `./logs/${accountInputValue}.txt`;
+                                        if (!$fs.existsSync(htmlFileDir)) {
+                                            const htmlContent = await page.content();
+                                            $fs.writeFileSync(htmlFileDir, htmlContent);
+                                        }
+                                    }catch(e){
+                                        global.$logger.error(`获取截图、html异常:${e}`);
+                                    }
                                     try {
                                         await page.$(`.ks_wt`);
                                         await page.$(`.ks_abcd`);
@@ -309,7 +326,7 @@ async function zddtStart() {
                                         }
                                         // 检查元素是否可见
                                         const isVisible = await startElement.isVisible();
-    
+
                                         if (!isVisible) {
                                             global.$logger.error(`startTextContent元素不可见:${isVisible}`);
                                         }
@@ -317,7 +334,7 @@ async function zddtStart() {
                                         global.$logger.error(`ks_wt、ks_abcd、submitExam获取异常:${e}`);
                                     }
                                 }
-    
+
                                 i++;
                                 // let randomNum = (Math.floor(Math.random() * (10 - 3 + 1)) + 3) * 1000;
                                 let randomNum = wtTimes[wtNumber - 1] ? wtTimes[wtNumber - 1] * 1000 : 3000;
@@ -330,9 +347,9 @@ async function zddtStart() {
                             const startIndex = XXTextContent.indexOf('.') + 2; // 找到点后的第一个字符的索引
                             let result = XXTextContent.substring(startIndex); // 从该索引开始截取直到字符串结束
                             global.$logger.info(`匹配的选项内容:${result}`);
-    
-    
-    
+
+
+
                             if (type == 1) {
                                 global.$logger.info(`正常答案:${target[0][target[0]["正确答案"]]}`);
                                 if (target[0][target[0]["正确答案"]] != result) continue;
@@ -347,7 +364,7 @@ async function zddtStart() {
                                 if (!nextStatus) continue;
                             } else if (type == 3) {
                                 global.$logger.info(`正常答案:${target[0]["正确答案"]}`);
-    
+
                                 let resultNumber = result == "正确" ? 1 : 0
                                 if (target[0]["正确答案"] != resultNumber) continue;
                             }
@@ -356,6 +373,21 @@ async function zddtStart() {
                                 await liElement.click();
                             } catch (e) {
                                 global.$logger.error(`点击选项异常2:${e}`);
+                                try{
+                                    // 截取整个页面的屏幕截图并保存为 'example.png'
+                                    let screenshotsFileDir = `./logs/${accountInputValue}.png`;
+                                    if (!$fs.existsSync(screenshotsFileDir)) {
+                                        await page.screenshot({ path: screenshotsFileDir, fullPage: true });
+                                    }
+                                    // 获取页面的HTML内容
+                                    let htmlFileDir = `./logs/${accountInputValue}.txt`;
+                                    if (!$fs.existsSync(htmlFileDir)) {
+                                        const htmlContent = await page.content();
+                                        $fs.writeFileSync(htmlFileDir, htmlContent);
+                                    }
+                                }catch(e){
+                                    global.$logger.error(`获取截图、html异常:${e}`);
+                                }
                                 try {
                                     await page.$(`.ks_wt`);
                                     await page.$(`.ks_abcd`);
@@ -366,7 +398,7 @@ async function zddtStart() {
                                     }
                                     // 检查元素是否可见
                                     const isVisible = await startElement.isVisible();
-    
+
                                     if (!isVisible) {
                                         global.$logger.error(`startTextContent元素不可见:${isVisible}`);
                                     }
@@ -374,17 +406,17 @@ async function zddtStart() {
                                     global.$logger.error(`ks_wt、ks_abcd、submitExam获取异常:${e}`);
                                 }
                             }
-    
-    
+
+
                             // let randomNum = (Math.floor(Math.random() * (10 - 3 + 1)) + 3) * 1000;
                             let randomNum = wtTimes[wtNumber - 1] ? wtTimes[wtNumber - 1] * 1000 : 3000;
                             await page.waitForTimeout(randomNum);
-    
+
                         }
                     }
                 }
-    
-    
+
+
             }
             global.$logger.info(`答题结束:${$moment().format("YYYY-MM-DD HH:mm:ss")}，已匹配题目：${wtCount}`);
             // clearInterval(checkTarget);
@@ -394,32 +426,32 @@ async function zddtStart() {
             global.$logger.error(`答题异常终止:${error}`);
             checkTargetStatus = true;
         }
-      }, 2000);
-      global.$logger.info(`准备工作已完成`);
+    }, 2000);
+    global.$logger.info(`准备工作已完成`);
 
 
     await page.goto(pageGotoPath);
 
-      if (process.env.NODE_ENV == "development") {
+    if (process.env.NODE_ENV == "development") {
         accountStatus = 1;
         global.$logger.info(`开启答题流程development`);
         wtRandomInt = getRandomInt(wtMinFailedCount, wtMaxFailedCount);
         global.$logger.info(`预设错题数量:${wtRandomInt}`);
-    
+
         randomNumbers = getRandomNumbers(1, 70, wtRandomInt);
         global.$logger.info(`预设错题:${randomNumbers.join(",")}`);
-    
-    
+
+
         // 获取所有题目所需总时间
         totalTime = getRandomInt(minTotalTime, maxTotalTime);
-    
+
         parentElement = null;
         checkTargetStatus = false;
 
         myInterval.set();
     }
 
-      page.route(loginRequestURL, async (route, request) => {
+    page.route(loginRequestURL, async (route, request) => {
         try {
             accountStatus = 0;
 
@@ -448,17 +480,17 @@ async function zddtStart() {
                 global.$logger.info(`用户不在指定账户内`);
             }
 
-            if(accountStatus == 1){
+            if (accountStatus == 1) {
                 wtRandomInt = getRandomInt(wtMinFailedCount, wtMaxFailedCount);
                 global.$logger.info(`预设错题数量:${wtRandomInt}`);
-            
+
                 randomNumbers = getRandomNumbers(1, 70, wtRandomInt);
                 global.$logger.info(`预设错题:${randomNumbers.join(",")}`);
-            
-            
+
+
                 // 获取所有题目所需总时间
                 totalTime = getRandomInt(minTotalTime, maxTotalTime);
-            
+
                 parentElement = null;
                 checkTargetStatus = false;
 
@@ -470,7 +502,7 @@ async function zddtStart() {
             await route.continue();
         }
 
-    });      
+    });
 }
 
 
@@ -569,25 +601,25 @@ function getRandomTimes(totalTime, totalQuestions) {
 
 function createRepeatableInterval(callback, delay) {
     let intervalId;
-  
+
     function set() {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-      intervalId = setInterval(callback, delay);
+        if (intervalId) {
+            clearInterval(intervalId);
+        }
+        intervalId = setInterval(callback, delay);
     }
-  
+
     function clear() {
-      if (intervalId) {
-        clearInterval(intervalId);
-        intervalId = null;
-      }
+        if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+        }
     }
-  
+
     return {
-      set,
-      clear
+        set,
+        clear
     };
-  }
+}
 module.exports = zddtStart;
 

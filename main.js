@@ -10,7 +10,7 @@ const logger = winston.createLogger({
         winston.format.printf(info => `${global.$moment(info.timestamp).format('YYYY-MM-DD HH:mm:ss SSS')} ${info.level}: ${info.message}`)
     ),
     transports: [
-        new winston.transports.File({ filename: 'application.log' })
+        new winston.transports.File({ filename: './logs/application.log' })
     ]
 });
 global.$logger = logger;
