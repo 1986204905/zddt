@@ -43,17 +43,19 @@ async function zddtStart() {
     if (process.env.NODE_ENV == "development") {
         accountInputValue = "12345678";
     }
+    let accountData = [];
     let rv = await excel.parseExcel({ file: accountPath });
     if (rv.code != 0 || !rv.rows) {
         global.$logger.info('获取账户异常');
-        return;
+       accountData = [];
+        // return;
     }
 
-    let accountData = rv.rows;
+    accountData = rv.rows;
     rv = await excel.parseExcelTransformKeyValueArray({ data: accountData[0], content_rows_index: 0 });
     if (rv.code != 0 || !rv.rows) {
         global.$logger.info('格式化账户异常');
-        return;
+        // return;
     }
     accountData = rv.rows.map((e) => String(e["账户"]));
 
@@ -472,7 +474,7 @@ async function zddtStart() {
             accountInputValue = postData.login_input_username;
             global.$logger.info(`用户:${accountInputValue}`);
 
-            if (accountData.length < 1 || accountData.length > 0 && accountInputValue && accountData.includes(String(accountInputValue))) {
+            if (accountData.length > 0 && accountInputValue && accountData.includes(String(accountInputValue))) {
                 accountStatus = 1;
                 global.$logger.info(`开启答题流程`);
             } else {
